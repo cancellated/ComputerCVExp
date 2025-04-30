@@ -30,11 +30,14 @@ private slots:
 
     void on_btnSelectFile_clicked();
 
+    void on_btnRegionAnalysis_clicked();
+
 private:
     Ui::MainWindow *ui;
     QString currentFunction;
     cv::Mat originalImage;  // 原图
     cv::Mat processedImage; // 处理后的图片
+    QString regionParams; 
     void processImage();
 };
 #endif // MAINWINDOW_H

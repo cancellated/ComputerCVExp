@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>1440</width>
+    <height>960</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -41,14 +41,43 @@ QPushButton:pressed {
     <widget class="QWidget" name="layoutWidget">
      <property name="geometry">
       <rect>
-       <x>50</x>
-       <y>60</y>
-       <width>461</width>
-       <height>62</height>
+       <x>370</x>
+       <y>150</y>
+       <width>611</width>
+       <height>641</height>
       </rect>
      </property>
      <layout class="QGridLayout" name="gridLayout">
+      <property name="leftMargin">
+       <number>6</number>
+      </property>
+      <property name="topMargin">
+       <number>6</number>
+      </property>
+      <property name="rightMargin">
+       <number>6</number>
+      </property>
+      <property name="bottomMargin">
+       <number>6</number>
+      </property>
+      <property name="horizontalSpacing">
+       <number>6</number>
+      </property>
       <item row="1" column="0">
+       <widget class="QPushButton" name="btnEdgeDetect">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="text">
+         <string>边缘检测</string>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>:/icons/edge.png</normaloff>:/icons/edge.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
        <widget class="QPushButton" name="btnHalfInverse">
         <property name="text">
          <string>半反色处理</string>
@@ -59,14 +88,17 @@ QPushButton:pressed {
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QPushButton" name="btnEdgeDetect">
+      <item row="0" column="1">
+       <widget class="QPushButton" name="btnRegionAnalysis">
         <property name="text">
-         <string>边缘检测</string>
+         <string>图像分割</string>
         </property>
-        <property name="icon">
-         <iconset>
-          <normaloff>:/icons/edge.png</normaloff>:/icons/edge.png</iconset>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="pushButton_2">
+        <property name="text">
+         <string>不规则区域描述</string>
         </property>
        </widget>
       </item>
@@ -131,6 +163,27 @@ QPushButton:pressed {
          </widget>
         </item>
        </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="lblParameters">
+       <property name="minimumSize">
+        <size>
+         <width>50</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>8</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>图片参数</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
+       </property>
       </widget>
      </item>
      <item>
