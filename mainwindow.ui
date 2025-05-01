@@ -35,7 +35,7 @@ QPushButton:pressed {
   </property>
   <widget class="QStackedWidget" name="stackedWidget">
    <property name="currentIndex">
-    <number>1</number>
+    <number>0</number>
    </property>
    <widget class="QWidget" name="menuPage">
     <widget class="QWidget" name="layoutWidget">
@@ -89,14 +89,14 @@ QPushButton:pressed {
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QPushButton" name="btnRegionAnalysis">
+       <widget class="QPushButton" name="btnROI">
         <property name="text">
-         <string>图像分割</string>
+         <string>不规则感兴趣区域</string>
         </property>
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QPushButton" name="pushButton_2">
+       <widget class="QPushButton" name="btnShapeAnalyze">
         <property name="text">
          <string>不规则区域描述</string>
         </property>
