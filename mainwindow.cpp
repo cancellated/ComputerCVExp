@@ -130,7 +130,7 @@ void MainWindow::on_btnSelectFile_clicked()
         originalPixmap = QPixmap::fromImage(originalImg);
 
         // 如果是ROI模式，进入选择状态
-        if(currentFunction == "roi") {
+        if(currentFunction == "roi" || currentFunction == "shapeAnalyze") {
             this->lassoPoints.clear();
             this->roiMask.release();
             ui->lblImageDisplay_2->clear();
@@ -219,6 +219,12 @@ void MainWindow::processImage()
             ui->lblParameters->setVisible(true);
         }},
         {"shapeAnalyze", [this](cv::Mat& src, cv::Mat& dst) {
+            // 检查是否有ROI遮罩
+            if(roiMask.empty()) {
+                dst = src.clone();
+                return;
+            }
+
             // 1. 转换为灰度图
             cv::Mat gray;
             if(src.channels() > 1) {
@@ -231,64 +237,68 @@ void MainWindow::processImage()
             cv::Mat binary;
             cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
 
-            // 3. 计算轮廓
+            // 3. 应用ROI遮罩
+            cv::Mat maskedBinary;
+            binary.copyTo(maskedBinary, roiMask);
+
+            // 4. 计算轮廓
             std::vector<std::vector<cv::Point>> contours;
-            cv::findContours(binary, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+            cv::findContours(maskedBinary, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-            // 4. 计算各项特征
+            // 创建彩色图像用于绘制
+            cv::Mat drawImage;
+            if(src.channels() == 1) {
+                cv::cvtColor(src, drawImage, cv::COLOR_GRAY2BGR);
+            } else {
+                // 确保BGR格式
+                if(src.channels() == 4) {
+                    cv::cvtColor(src, drawImage, cv::COLOR_BGRA2BGR);
+                } else {
+                    src.copyTo(drawImage);
+                }
+            }
+
+            // 5. 计算各项特征并绘制
             for(auto& contour : contours) {
-                // 外接矩形
-                cv::Rect boundingRect = cv::boundingRect(contour);
+                // 跳过太小的轮廓
+                if(contour.size() < 5) continue;
 
-                // 外观比(宽高比)
-                double aspectRatio = (double)boundingRect.width / boundingRect.height;
+                // 绘制原始轮廓（红色）
+                cv::drawContours(drawImage, std::vector<std::vector<cv::Point>>{contour}, -1, cv::Scalar(0,0,255), 2);
 
-                // 形状因子(圆形度)
+                // 外接矩形（绿色）
+                cv::Rect rect = cv::boundingRect(contour);
+                cv::rectangle(drawImage, rect, cv::Scalar(0,255,0), 2);
+
+                // 最小外接圆（蓝色）
+                cv::Point2f c;
+                float r;
+                cv::minEnclosingCircle(contour, c, r);
+                cv::circle(drawImage, c, r, cv::Scalar(255,0,0), 2);
+
+                // 计算特征参数
                 double area = cv::contourArea(contour);
                 double perimeter = cv::arcLength(contour, true);
+                double aspectRatio = (double)rect.width / rect.height;
                 double shapeFactor = (4 * CV_PI * area) / (perimeter * perimeter);
+                double sphericity = area / (CV_PI * r * r);
 
-                // 球状性
-                cv::Point2f center;
-                float radius;
-                cv::minEnclosingCircle(contour, center, radius);
-                double sphericity = area / (CV_PI * radius * radius);
-
-                // 创建彩色图像用于绘制
-                cv::Mat drawImage;
-                cv::cvtColor(binary, drawImage, cv::COLOR_GRAY2BGR);
-
-                // 绘制外接矩形
-                cv::rectangle(drawImage, boundingRect, cv::Scalar(0,255,0), 2);
-
-                // 绘制最小外接圆
-                cv::circle(drawImage, center, radius, cv::Scalar(0,0,255), 2);
-
-
-                float maxRadius = std::min((float)drawImage.cols/2, (float)drawImage.rows/2);
-                radius = std::min(radius, maxRadius);
-                center.x = std::max(radius, std::min(center.x, (float)drawImage.cols - radius));
-                center.y = std::max(radius, std::min(center.y, (float)drawImage.rows - radius));
-                // 存储参数到成员变量
+                // 存储参数
                 regionParams = QString("宽高比: %1\n形状因子: %2\n球状性: %3")
                               .arg(aspectRatio, 0, 'f', 2)
                               .arg(shapeFactor, 0, 'f', 2)
                               .arg(sphericity, 0, 'f', 2);
-
-                // 显示参数并居中
-                if(!regionParams.isEmpty()) {
-                    ui->lblParameters->setText(regionParams);
-                    ui->lblParameters->setAlignment(Qt::AlignCenter);
-                    ui->lblParameters->setWordWrap(true);
-                    ui->lblParameters->setVisible(true); // 仅在此功能显示
-                }
-
-                //绘制图形
-                cv::rectangle(drawImage, boundingRect, cv::Scalar(0,255,0), 2);
-                cv::circle(drawImage, center, radius, cv::Scalar(0,0,255), 2);
-
-                dst = drawImage;
             }
+
+            // 显示参数
+            if(!regionParams.isEmpty()) {
+                ui->lblParameters->setText(regionParams);
+                ui->lblParameters->setAlignment(Qt::AlignCenter);
+                ui->lblParameters->setWordWrap(true);
+                ui->lblParameters->setVisible(true);
+            }
+
+            dst = drawImage;
         }}
     };
 
@@ -302,16 +312,16 @@ void MainWindow::processImage()
     }
 
     // 处理后的颜色转换
-    cv::Mat displayProcessed;
-    if(processedImage.channels() == 4) {
-        cv::cvtColor(processedImage, displayProcessed, cv::COLOR_BGRA2RGBA);
-    }
-    else if(processedImage.channels() == 3) {
-        cv::cvtColor(processedImage, displayProcessed, cv::COLOR_BGR2RGB);
-    }
-    else {
-        displayProcessed = processedImage;
-    }
+cv::Mat displayProcessed;
+if(processedImage.channels() == 4) {
+    cv::cvtColor(processedImage, displayProcessed, cv::COLOR_BGRA2RGBA);
+}
+else if(processedImage.channels() == 3) {
+    cv::cvtColor(processedImage, displayProcessed, cv::COLOR_BGR2RGB); // BGR转RGB
+}
+else {
+    cv::cvtColor(processedImage, displayProcessed, cv::COLOR_GRAY2RGB); // 灰度转RGB
+}
 
     QImage processedImg;
     switch(displayProcessed.type()) {
