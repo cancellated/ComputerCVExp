@@ -155,7 +155,7 @@ void MainWindow::processImage()
             dst = src.clone();
             int half_height = dst.rows / 2;
 
-            // 强制统一为BGR格式处理
+            // 统一为BGR格式处理
             if(dst.channels() == 1) {
                 cv::cvtColor(dst, dst, cv::COLOR_GRAY2BGR);
             }
@@ -166,15 +166,63 @@ void MainWindow::processImage()
             cv::Mat top_half = dst.rowRange(0, half_height);
             cv::bitwise_not(top_half, top_half);
 
-            // 直接复制原图下半部分
+            // 复制原图下半部分
             cv::Mat bottom_half = dst.rowRange(half_height, dst.rows);
             src.rowRange(half_height, src.rows).copyTo(bottom_half);
         }},
         {"edgeDetect", [](cv::Mat& src, cv::Mat& dst) {
-            cv::Mat gray, edges;
+            // 转换为灰度图
+            cv::Mat gray;
             cv::cvtColor(src, gray, cv::COLOR_BGR2GRAY);
-            cv::Canny(gray, edges, 50, 150);
-            cv::cvtColor(edges, dst, cv::COLOR_GRAY2BGR);
+            
+            // SUSAN算子
+            cv::Mat susanEdges = cv::Mat::zeros(gray.size(), CV_8UC1);
+            cv::Mat corners = cv::Mat::zeros(gray.size(), CV_8UC1);
+            
+            // SUSAN参数
+            int radius = 3;
+            
+            // 实现SUSAN算法
+            for(int y = radius; y < gray.rows - radius; y++) {
+                for(int x = radius; x < gray.cols - radius; x++) {
+                    int similar = 0;
+                    std::vector<cv::Point> cornerPoints;
+                    
+                    // 检查圆形邻域
+                    for(int i = -radius; i <= radius; i++) {
+                        for(int j = -radius; j <= radius; j++) {
+                            if(i*i + j*j <= radius*radius) {
+                                if(abs(gray.at<uchar>(y, x) - gray.at<uchar>(y+i, x+j)) < 25) {
+                                    similar++;
+                                    cornerPoints.emplace_back(x+j, y+i);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 边缘检测
+                    if(similar < 25) {
+                        susanEdges.at<uchar>(y, x) = 255;
+                    }
+                    
+                    // 角点检测
+                    if(similar <= 3) {
+                        corners.at<uchar>(y, x) = 255;
+                    }
+                }
+            }
+            
+            // 合并结果并标记角点
+            cv::cvtColor(susanEdges, dst, cv::COLOR_GRAY2BGR);
+            
+            // 用红色标记角点
+            for(int y = 0; y < corners.rows; y++) {
+                for(int x = 0; x < corners.cols; x++) {
+                    if(corners.at<uchar>(y, x) == 255) {
+                        cv::circle(dst, cv::Point(x, y), 1, cv::Scalar(0, 0, 255), -1);
+                    }
+                }
+            }
         }},
         {"roi", [this](cv::Mat& src, cv::Mat& dst) {
             qDebug() << "处理前遮罩状态:" << roiMask.empty() << "尺寸:" << roiMask.cols << "x" << roiMask.rows;
@@ -186,7 +234,6 @@ void MainWindow::processImage()
                 return;
             }
             
-            // 确保应用遮罩前图像和遮罩类型匹配
             if(roiMask.type() != CV_8UC1) {
                 cv::Mat tempMask;
                 roiMask.convertTo(tempMask, CV_8UC1);
@@ -204,7 +251,7 @@ void MainWindow::processImage()
             }
             cv::Scalar meanVal = cv::mean(gray, roiMask);
             
-            // 确保参数显示
+            // 参数显示
             cv::Rect boundingRect = cv::boundingRect(roiMask);
             qDebug() << "ROI区域参数: x=" << boundingRect.x << "y=" << boundingRect.y 
                      << "width=" << boundingRect.width << "height=" << boundingRect.height;
@@ -250,7 +297,6 @@ void MainWindow::processImage()
             if(src.channels() == 1) {
                 cv::cvtColor(src, drawImage, cv::COLOR_GRAY2BGR);
             } else {
-                // 确保BGR格式
                 if(src.channels() == 4) {
                     cv::cvtColor(src, drawImage, cv::COLOR_BGRA2BGR);
                 } else {
@@ -302,7 +348,6 @@ void MainWindow::processImage()
         }}
     };
 
-    // 将QString转换为std::string
     std::string funcName = currentFunction.toStdString();
 
     // 查找并执行处理函数
@@ -312,16 +357,16 @@ void MainWindow::processImage()
     }
 
     // 处理后的颜色转换
-cv::Mat displayProcessed;
-if(processedImage.channels() == 4) {
-    cv::cvtColor(processedImage, displayProcessed, cv::COLOR_BGRA2RGBA);
-}
-else if(processedImage.channels() == 3) {
-    cv::cvtColor(processedImage, displayProcessed, cv::COLOR_BGR2RGB); // BGR转RGB
-}
-else {
-    cv::cvtColor(processedImage, displayProcessed, cv::COLOR_GRAY2RGB); // 灰度转RGB
-}
+    cv::Mat displayProcessed;
+    if(processedImage.channels() == 4) {
+        cv::cvtColor(processedImage, displayProcessed, cv::COLOR_BGRA2RGBA);
+    }
+    else if(processedImage.channels() == 3) {
+        cv::cvtColor(processedImage, displayProcessed, cv::COLOR_BGR2RGB); // BGR转RGB
+    }
+    else {
+        cv::cvtColor(processedImage, displayProcessed, cv::COLOR_GRAY2RGB); // 灰度转RGB
+    }
 
     QImage processedImg;
     switch(displayProcessed.type()) {
@@ -398,7 +443,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
                 }
                 
                 // 使用原始图像尺寸计算缩放比例
-                QSize actualImageSize = originalPixmap.size();
                 QSize displayedSize = ui->lblImageDisplay_1->size();
                 displayedSize.scale(ui->lblImageDisplay_1->size(), Qt::KeepAspectRatio);
                 
@@ -426,15 +470,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
                 this->roiMask = mask.clone();
                 qDebug() << "遮罩已创建并保存";
                 
-                // 显示ROI参数
-                cv::Rect boundingRect = cv::boundingRect(contourPoints);
-                regionParams = QString("ROI区域:\nX: %1\nY: %2\n宽度: %3\n高度: %4")
-                              .arg(boundingRect.x).arg(boundingRect.y)
-                              .arg(boundingRect.width).arg(boundingRect.height);
-                ui->lblParameters->setText(regionParams);
-                ui->lblParameters->setAlignment(Qt::AlignCenter);
-                ui->lblParameters->setWordWrap(true);
-                ui->lblParameters->setVisible(true);
                 
                 // 恢复显示状态
                 isSelectingROI = false;
